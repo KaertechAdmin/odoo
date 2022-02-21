@@ -121,6 +121,13 @@ class AccountAnalyticLine(models.Model):
             project = self.env['project.project'].browse(vals.get('project_id'))
             vals['account_id'] = project.analytic_account_id.id
             vals['company_id'] = project.analytic_account_id.company_id.id
+            if not vals['company_id']:
+                user_id = vals.get("user_id")
+                if user_id:
+                   user = self.env["res.users"].browse(user_id)
+                   vals["company_id"] = user.company_id.id
+                else:
+                    vals["company_id"] = self.env.user.company_id.id
             if not project.analytic_account_id.active:
                 raise UserError(_('The project you are timesheeting on is not linked to an active analytic account. Set one on the project configuration.'))
         # employee implies user
@@ -167,8 +174,11 @@ class AccountAnalyticLine(models.Model):
             for timesheet in sudo_self:
                 cost = timesheet.employee_id.timesheet_cost or 0.0
                 amount = -timesheet.unit_amount * cost
+                currency_id = timesheet.account_id.currency_id
+                if not currency_id:
+                    currency_id = timesheet.company_id.currency_id
                 amount_converted = timesheet.employee_id.currency_id._convert(
-                    amount, timesheet.account_id.currency_id, self.env.user.company_id, timesheet.date)
+                    amount, currency_id, self.env.user.company_id, timesheet.date)
                 result[timesheet.id].update({
                     'amount': amount_converted,
                 })
